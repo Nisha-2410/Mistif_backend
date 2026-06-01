@@ -36,7 +36,7 @@ function scoreBudget(productPrice, budget) {
   return -8;
 }
 
-function scoreProduct(product, keywords, queryTokens) {
+function scoreProduct(product, keywords, queryTokens, queryText) {
   const attributes = normalizeList(keywords.attributes);
   const targetAudience = normalizeList(keywords.targetAudience);
   const ingredients = normalizeList(keywords.ingredients);
@@ -65,9 +65,12 @@ function scoreProduct(product, keywords, queryTokens) {
   }
 
   for (const ingredient of ingredients) {
+    const explicitlyRequested = queryText.includes(ingredient);
     if (haystack.includes(ingredient)) {
-      score += 10;
+      score += explicitlyRequested ? 30 : 10;
       reasons.push(`includes ${ingredient}`);
+    } else if (explicitlyRequested) {
+      score -= 30;
     }
   }
 
@@ -91,9 +94,13 @@ function scoreProduct(product, keywords, queryTokens) {
     }
   }
 
-  if (keywords.productType && safeLower(product.subcategory).includes(safeLower(keywords.productType))) {
-    score += 15;
-    reasons.push(`is a strong ${keywords.productType} match`);
+  if (keywords.productType) {
+    if (safeLower(product.subcategory).includes(safeLower(keywords.productType))) {
+      score += 24;
+      reasons.push(`is a strong ${keywords.productType} match`);
+    } else {
+      score -= 30;
+    }
   }
 
   score += scoreBudget(product.price, budget);
@@ -102,6 +109,7 @@ function scoreProduct(product, keywords, queryTokens) {
 
   return {
     score: Math.max(0, Math.min(100, score)),
+    rankScore: score,
     reasons: Array.from(new Set(reasons)).slice(0, 3)
   };
 }
@@ -123,19 +131,22 @@ function buildWhyForYou(product, scoreData, keywords) {
 
 function recommendProducts(products, keywords, query, limit = 6) {
   const queryTokens = keywordSetFromQuery(query);
+  const queryText = safeLower(query);
 
   return products
     .map((product) => {
-      const scoreData = scoreProduct(product, keywords, queryTokens);
+      const scoreData = scoreProduct(product, keywords, queryTokens, queryText);
       return {
         ...product,
         matchScore: scoreData.score,
+        rankScore: scoreData.rankScore,
         matchReason: scoreData.reasons[0] || "Good overall fit for your request",
         whyForYou: buildWhyForYou(product, scoreData, keywords)
       };
     })
-    .sort((a, b) => b.matchScore - a.matchScore || b.rating - a.rating)
-    .slice(0, limit);
+    .sort((a, b) => b.rankScore - a.rankScore || b.rating - a.rating)
+    .slice(0, limit)
+    .map(({ rankScore, ...product }) => product);
 }
 
 module.exports = { recommendProducts };

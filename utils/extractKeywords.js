@@ -21,6 +21,7 @@ const CONCERN_MAP = {
   darkspots: { concerns: ["dark spots"], attributes: ["brightening"], ingredients: ["vitamin c", "niacinamide"] },
   blackheads: { concerns: ["blackheads"], ingredients: ["salicylic acid"] },
   redness: { concerns: ["redness"], attributes: ["calming"], ingredients: ["cica", "panthenol"] },
+  retinol: { concerns: ["fine lines", "texture"], ingredients: ["retinol"] },
   sunscreen: { concerns: ["sun protection"], attributes: ["lightweight"] }
 };
 
@@ -35,7 +36,8 @@ function heuristicExtractKeywords(userQuery) {
   const productType =
     PRODUCT_TYPES.find((type) => normalized.includes(type)) ||
     (normalized.includes("spf") ? "sunscreen" : "") ||
-    (normalized.includes("face wash") ? "cleanser" : "");
+    (normalized.includes("face wash") ? "cleanser" : "") ||
+    (normalized.includes("retinol") ? "serum" : "");
 
   const attributes = [];
   const targetAudience = [];
@@ -60,6 +62,14 @@ function heuristicExtractKeywords(userQuery) {
   if (normalized.includes("teen")) targetAudience.push("teens");
   if (normalized.includes("summer") || normalized.includes("humid")) attributes.push("lightweight");
   if (normalized.includes("winter")) attributes.push("hydrating");
+  if (normalized.includes("irritat") || normalized.includes("beginner") || normalized.includes("first retinol")) {
+    attributes.push("gentle");
+    concerns.push("sensitivity");
+  }
+  if (normalized.includes("retinol")) {
+    ingredients.push("retinol");
+    if (!productType) targetAudience.push("beginner");
+  }
 
   const budgetMatch = normalized.match(/under\s+(\d+)/);
   let price = "";
@@ -97,7 +107,7 @@ Return this exact shape:
   "productType": "cleanser | moisturizer | serum | sunscreen | exfoliant | ''",
   "attributes": ["lightweight", "hydrating", "gentle", "matte", "brightening", "calming"],
   "targetAudience": ["men", "women", "teens", "sensitive skin", "oily skin"],
-  "ingredients": ["niacinamide", "salicylic acid", "ceramides", "hyaluronic acid", "vitamin c", "cica"],
+  "ingredients": ["niacinamide", "salicylic acid", "ceramides", "hyaluronic acid", "vitamin c", "cica", "retinol"],
   "concerns": ["acne", "dryness", "oiliness", "pigmentation", "sensitivity", "blackheads", "redness"],
   "price": "budget phrase if any"
 }
