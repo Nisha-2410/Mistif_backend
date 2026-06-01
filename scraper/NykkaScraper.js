@@ -21,16 +21,19 @@ async function scrapeNykaa(query) {
       const price = $(el).find(".css-111z9ua").text().trim();
       const relativeLink = $(el).find("a").attr("href");
 
+      // ✅ Extract image
+      let image = $(el).find("img").attr("src") || $(el).find("img").attr("data-src");
+
       const link = relativeLink
         ? "https://www.nykaa.com" + relativeLink
         : null;
 
-      if (name && price && link) {
-        products.push({ name, price, link });
+      if (name && price && link && image) {
+        products.push({ name, price, link, image });
       }
     });
 
-    console.log(`✅ Found ${products.length} products`,products);
+    console.log(`✅ Found ${products.length} products`, products);
     return products;
 
   } catch (err) {
@@ -40,4 +43,5 @@ async function scrapeNykaa(query) {
 }
 
 module.exports = { scrapeNykaa };
+
 
