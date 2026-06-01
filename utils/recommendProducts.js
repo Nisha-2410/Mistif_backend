@@ -28,6 +28,11 @@ function keywordSetFromQuery(query) {
   );
 }
 
+function hasPhrase(text, phrase) {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  return new RegExp(`\\b${escaped}\\b`).test(text);
+}
+
 function scoreBudget(productPrice, budget) {
   if (!budget) return 0;
   if (budget.max && productPrice <= budget.max) return 16;
@@ -65,7 +70,7 @@ function scoreProduct(product, keywords, queryTokens, queryText) {
   }
 
   for (const ingredient of ingredients) {
-    const explicitlyRequested = queryText.includes(ingredient);
+    const explicitlyRequested = hasPhrase(queryText, ingredient);
     if (haystack.includes(ingredient)) {
       score += explicitlyRequested ? 30 : 10;
       reasons.push(`includes ${ingredient}`);
@@ -76,8 +81,10 @@ function scoreProduct(product, keywords, queryTokens, queryText) {
 
   for (const attribute of attributes) {
     if (haystack.includes(attribute)) {
-      score += 8;
+      score += hasPhrase(queryText, attribute) ? 16 : 8;
       reasons.push(`matches ${attribute} preference`);
+    } else if (hasPhrase(queryText, attribute)) {
+      score -= 12;
     }
   }
 

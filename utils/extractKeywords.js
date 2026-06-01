@@ -10,34 +10,53 @@ const ATTRIBUTE_MAP = {
   calming: ["calming"],
   nongreasy: ["non-greasy"]
 };
-const CONCERN_MAP = {
-  acne: { concerns: ["acne"], ingredients: ["salicylic acid", "niacinamide"] },
-  pimples: { concerns: ["acne"], ingredients: ["salicylic acid", "niacinamide"] },
-  oily: { concerns: ["oiliness"], attributes: ["lightweight", "matte"], ingredients: ["niacinamide"] },
-  dry: { concerns: ["dryness"], attributes: ["hydrating"], ingredients: ["ceramides", "hyaluronic acid"] },
-  sensitive: { concerns: ["sensitivity"], attributes: ["gentle"], ingredients: ["panthenol", "ceramides"] },
-  dull: { concerns: ["dullness"], attributes: ["brightening"], ingredients: ["vitamin c"] },
-  pigmentation: { concerns: ["pigmentation"], attributes: ["brightening"], ingredients: ["vitamin c", "niacinamide"] },
-  darkspots: { concerns: ["dark spots"], attributes: ["brightening"], ingredients: ["vitamin c", "niacinamide"] },
-  blackheads: { concerns: ["blackheads"], ingredients: ["salicylic acid"] },
-  redness: { concerns: ["redness"], attributes: ["calming"], ingredients: ["cica", "panthenol"] },
-  retinol: { concerns: ["fine lines", "texture"], ingredients: ["retinol"] },
-  sunscreen: { concerns: ["sun protection"], attributes: ["lightweight"] }
-};
+const INTENT_MAP = [
+  { phrases: ["acne", "pimple", "pimples", "breakout", "breakouts"], concerns: ["acne"], ingredients: ["salicylic acid", "niacinamide"] },
+  { phrases: ["oily", "oiliness", "greasy"], concerns: ["oiliness"], attributes: ["lightweight", "matte"], ingredients: ["niacinamide"] },
+  { phrases: ["dry", "dryness"], concerns: ["dryness"], attributes: ["hydrating"], ingredients: ["ceramides", "hyaluronic acid"] },
+  { phrases: ["sensitive", "sensitivity", "irritation", "irritate"], concerns: ["sensitivity"], attributes: ["gentle"], ingredients: ["panthenol", "ceramides"] },
+  { phrases: ["dull", "dullness"], concerns: ["dullness"], attributes: ["brightening"], ingredients: ["vitamin c"] },
+  { phrases: ["pigmentation", "hyperpigmentation", "dark spot", "dark spots"], concerns: ["pigmentation", "dark spots"], attributes: ["brightening"], ingredients: ["vitamin c", "niacinamide"] },
+  { phrases: ["blackhead", "blackheads", "congestion", "clogged pores"], concerns: ["blackheads", "pores"], ingredients: ["salicylic acid"] },
+  { phrases: ["redness", "red", "inflamed"], concerns: ["redness"], attributes: ["calming"], ingredients: ["cica", "panthenol"] },
+  { phrases: ["fine line", "fine lines", "wrinkle", "wrinkles", "aging"], concerns: ["fine lines", "aging"], ingredients: ["retinol"] },
+  { phrases: ["spf", "sunscreen", "sun protection"], concerns: ["sun protection"], attributes: ["lightweight"] }
+];
+const KNOWN_INGREDIENTS = [
+  "alpha arbutin",
+  "salicylic acid",
+  "hyaluronic acid",
+  "tranexamic acid",
+  "glycolic acid",
+  "lactic acid",
+  "vitamin c",
+  "niacinamide",
+  "ceramides",
+  "panthenol",
+  "retinol",
+  "cica",
+  "bha",
+  "aha",
+  "pha"
+];
 
 function uniq(values) {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function hasPhrase(text, phrase) {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  return new RegExp(`\\b${escaped}\\b`).test(text);
 }
 
 function heuristicExtractKeywords(userQuery) {
   const normalized = String(userQuery || "").toLowerCase().replace(/[^a-z0-9 ]+/g, "");
   const tokens = normalized.split(/\s+/).filter(Boolean);
 
-  const productType =
+  let productType =
     PRODUCT_TYPES.find((type) => normalized.includes(type)) ||
     (normalized.includes("spf") ? "sunscreen" : "") ||
-    (normalized.includes("face wash") ? "cleanser" : "") ||
-    (normalized.includes("retinol") ? "serum" : "");
+    (normalized.includes("face wash") ? "cleanser" : "");
 
   const attributes = [];
   const targetAudience = [];
@@ -49,26 +68,30 @@ function heuristicExtractKeywords(userQuery) {
       attributes.push(...ATTRIBUTE_MAP[token]);
     }
 
-    const match = CONCERN_MAP[token];
-    if (match) {
-      attributes.push(...(match.attributes || []));
-      ingredients.push(...(match.ingredients || []));
-      concerns.push(...(match.concerns || []));
+  }
+
+  for (const intent of INTENT_MAP) {
+    if (intent.phrases.some((phrase) => hasPhrase(normalized, phrase))) {
+      attributes.push(...(intent.attributes || []));
+      ingredients.push(...(intent.ingredients || []));
+      concerns.push(...(intent.concerns || []));
     }
   }
 
-  if (normalized.includes("men")) targetAudience.push("men");
-  if (normalized.includes("women")) targetAudience.push("women");
-  if (normalized.includes("teen")) targetAudience.push("teens");
+  for (const ingredient of KNOWN_INGREDIENTS) {
+    if (hasPhrase(normalized, ingredient)) ingredients.push(ingredient);
+  }
+
+  if (!productType && ingredients.length) productType = "serum";
+
+  if (hasPhrase(normalized, "men")) targetAudience.push("men");
+  if (hasPhrase(normalized, "women")) targetAudience.push("women");
+  if (hasPhrase(normalized, "teen") || hasPhrase(normalized, "teens")) targetAudience.push("teens");
   if (normalized.includes("summer") || normalized.includes("humid")) attributes.push("lightweight");
   if (normalized.includes("winter")) attributes.push("hydrating");
-  if (normalized.includes("irritat") || normalized.includes("beginner") || normalized.includes("first retinol")) {
+  if (normalized.includes("irritat") || normalized.includes("beginner") || normalized.includes("first ")) {
     attributes.push("gentle");
     concerns.push("sensitivity");
-  }
-  if (normalized.includes("retinol")) {
-    ingredients.push("retinol");
-    if (!productType) targetAudience.push("beginner");
   }
 
   const budgetMatch = normalized.match(/under\s+(\d+)/);
