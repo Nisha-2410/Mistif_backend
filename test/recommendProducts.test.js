@@ -40,6 +40,15 @@ async function run() {
     );
   }
 
+  const comparisonQuery = "lightweight gel moisturizer for oily acne prone skin";
+  const comparisonKeywords = await extractKeywords(comparisonQuery);
+  const comparisonProducts = recommendProducts(productCatalog, comparisonKeywords, comparisonQuery, 6);
+  assert.strictEqual(
+    new Set(comparisonProducts.map((product) => product.whyForYou)).size,
+    comparisonProducts.length,
+    "Expected each recommendation to have a distinct explanation"
+  );
+
   console.log(`Passed ${cases.length} recommendation ranking checks.`);
 }
 

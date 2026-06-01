@@ -145,6 +145,27 @@ function buildCaution(cons) {
   return `A small heads-up: ${caution}.`;
 }
 
+function parseSize(value) {
+  const match = String(value || "").match(/(\d+(?:\.\d+)?)\s*(ml|g)/i);
+  return match ? { amount: Number(match[1]), unit: match[2].toLowerCase() } : null;
+}
+
+function buildProductAngle(product, texture, size) {
+  const title = safeLower(product.title);
+  const tags = normalizeList(product.tags);
+  const parsedSize = parseSize(size);
+
+  if (title.includes("night")) return "I would especially consider it if you want a lightweight night-routine step.";
+  if (title.includes("oil-free") || tags.some((tag) => tag.includes("oil control"))) {
+    return "The oil-conscious format is the useful distinction here if you dislike a heavy daytime feel.";
+  }
+  if (title.includes("hyaluronic")) return "The hydration-focused formula is the reason to pick this one if your skin feels oily but still dehydrated.";
+  if (product.price <= 500) return `At Rs. ${product.price}, it is also one of the more approachable options if you want to keep the routine simple.`;
+  if (parsedSize?.amount >= 100) return `The ${size} size is a practical advantage if you want an everyday product that will last longer.`;
+  if (texture) return `The ${texture} is the detail that makes this option worth considering for regular use.`;
+  return "It is a straightforward option if you want to keep the routine easy to follow.";
+}
+
 function buildWhyForYou(product, scoreData, keywords, queryText) {
   const concerns = scoreData.matchedConcerns.slice(0, 2);
   const ingredients = scoreData.matchedIngredients.slice(0, 2);
@@ -152,6 +173,10 @@ function buildWhyForYou(product, scoreData, keywords, queryText) {
   const attributes = scoreData.matchedAttributes.slice(0, 2);
   const texture = safeLower(product.specs?.texture);
   const skinType = product.specs?.skinType || "your routine";
+  const size = product.specs?.volume || product.specs?.size;
+  const productLabel = product.title.toLowerCase().startsWith(product.brand.toLowerCase())
+    ? product.title
+    : `${product.brand} ${product.title}`;
 
   let opening;
   if (requestedIngredients.length) {
@@ -166,18 +191,19 @@ function buildWhyForYou(product, scoreData, keywords, queryText) {
 
   let detail;
   if (ingredients.length && texture) {
-    detail = `The ${texture} gives you ${joinNatural(ingredients)} in a format that should feel easy to work into your routine.`;
+    detail = `${productLabel} comes as a ${texture}${size ? ` in a ${size} size` : ""}, with ${joinNatural(ingredients)} to make it easy to work into your routine.`;
   } else if (ingredients.length) {
-    detail = `It gives you ${joinNatural(ingredients)}, which is a sensible place to start for your goals.`;
+    detail = `${productLabel} gives you ${joinNatural(ingredients)}${size ? ` in a ${size} size` : ""}, which is a sensible place to start for your goals.`;
   } else if (texture) {
-    detail = `Its ${texture} should suit ${skinType.toLowerCase()} without making the routine feel complicated.`;
+    detail = `${productLabel} has a ${texture}${size ? ` in a ${size} size` : ""}, which should suit ${skinType.toLowerCase()} without making the routine feel complicated.`;
   } else {
-    detail = `Its formula is a practical match for ${skinType.toLowerCase()}.`;
+    detail = `${productLabel} is a practical match for ${skinType.toLowerCase()}.`;
   }
 
   const caution = buildCaution(product.cons);
+  const productAngle = buildProductAngle(product, texture, size);
 
-  return `${opening} ${detail} ${caution}`;
+  return `${opening} ${detail} ${productAngle} ${caution}`;
 }
 
 function recommendProducts(products, keywords, query, limit = 6) {

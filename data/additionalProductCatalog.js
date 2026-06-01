@@ -270,9 +270,34 @@ const productSeeds = [
   ["Klairs Gentle Black Sugar Facial Polish", "Klairs", 1350, 1499, "exfoliant", "ahaExfoliant", "110g", 4.3, 880]
 ];
 
+const titleIngredientMap = [
+  ["alpha arbutin", "alpha arbutin"],
+  ["salicylic acid", "salicylic acid"],
+  ["hyaluronic acid", "hyaluronic acid"],
+  ["niacinamide", "niacinamide"],
+  ["ceramide", "ceramides"],
+  ["vitamin c", "vitamin c"],
+  ["vitamin b5", "panthenol"],
+  ["retinol", "retinol"],
+  ["cica", "cica"],
+  ["centella", "cica"],
+  ["bha", "bha"],
+  ["aha", "aha"],
+  ["pha", "pha"]
+];
+
+function getTitleIngredients(title, fallbackIngredients) {
+  const normalizedTitle = title.toLowerCase();
+  const titleIngredients = titleIngredientMap
+    .filter(([phrase]) => normalizedTitle.includes(phrase))
+    .map(([, ingredient]) => ingredient);
+  return Array.from(new Set([...titleIngredients, ...fallbackIngredients]));
+}
+
 const additionalProductCatalog = productSeeds.map(
   ([title, brand, price, originalPrice, subcategory, profileName, volume, rating, reviewCount], index) => {
     const profile = profiles[profileName];
+    const ingredients = getTitleIngredients(title, profile.ingredients);
     return {
       id: `skincare-${index + 25}`,
       title,
@@ -289,11 +314,11 @@ const additionalProductCatalog = productSeeds.map(
         skinType: profile.skinType,
         volume,
         texture: profile.texture,
-        keyIngredients: profile.ingredients.join(", ")
+        keyIngredients: ingredients.join(", ")
       },
       tags: [...profile.tags],
       concerns: [...profile.concerns],
-      ingredients: [...profile.ingredients],
+      ingredients,
       pros: [...profile.pros],
       cons: [...profile.cons],
       reviewSummary: profile.reviewSummary
