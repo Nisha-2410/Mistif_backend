@@ -61,11 +61,15 @@ function scoreProduct(product, keywords, queryTokens, queryText) {
 
   let score = 40;
   const reasons = [];
+  const matchedConcerns = [];
+  const matchedIngredients = [];
+  const matchedAttributes = [];
 
   for (const concern of concerns) {
     if (haystack.includes(concern)) {
       score += 12;
       reasons.push(`targets ${concern}`);
+      matchedConcerns.push(concern);
     }
   }
 
@@ -74,6 +78,7 @@ function scoreProduct(product, keywords, queryTokens, queryText) {
     if (haystack.includes(ingredient)) {
       score += explicitlyRequested ? 30 : 10;
       reasons.push(`includes ${ingredient}`);
+      matchedIngredients.push(ingredient);
     } else if (explicitlyRequested) {
       score -= 30;
     }
@@ -83,6 +88,7 @@ function scoreProduct(product, keywords, queryTokens, queryText) {
     if (haystack.includes(attribute)) {
       score += hasPhrase(queryText, attribute) ? 16 : 8;
       reasons.push(`matches ${attribute} preference`);
+      matchedAttributes.push(attribute);
     } else if (hasPhrase(queryText, attribute)) {
       score -= 12;
     }
@@ -117,23 +123,61 @@ function scoreProduct(product, keywords, queryTokens, queryText) {
   return {
     score: Math.max(0, Math.min(100, score)),
     rankScore: score,
-    reasons: Array.from(new Set(reasons)).slice(0, 3)
+    reasons: Array.from(new Set(reasons)).slice(0, 3),
+    matchedConcerns: Array.from(new Set(matchedConcerns)),
+    matchedIngredients: Array.from(new Set(matchedIngredients)),
+    matchedAttributes: Array.from(new Set(matchedAttributes))
   };
 }
 
-function buildWhyForYou(product, scoreData, keywords) {
-  const productLabel = product.title.toLowerCase().startsWith(product.brand.toLowerCase())
-    ? product.title
-    : `${product.brand} ${product.title}`;
-  const reasonLine = scoreData.reasons.length
-    ? scoreData.reasons.join(", ")
-    : "aligns with your needs based on category, benefits, and buyer feedback";
+function joinNatural(values) {
+  const uniqueValues = Array.from(new Set(values.filter(Boolean)));
+  if (uniqueValues.length <= 1) return uniqueValues[0] || "";
+  return `${uniqueValues.slice(0, -1).join(", ")} and ${uniqueValues.at(-1)}`;
+}
 
-  const concernLine = (keywords.concerns || []).length
-    ? `It especially lines up with concerns like ${(keywords.concerns || []).slice(0, 2).join(" and ")}.`
-    : `Its review profile suggests it is a dependable fit for ${product.specs.skinType || "everyday use"}.`;
+function buildCaution(cons) {
+  if (!cons?.length) return "Introduce it gradually and see how your skin responds.";
+  const caution = cons[0].replace(/\.$/, "");
+  if (/^(can|may|must|needs?|requires?)\b/i.test(caution)) {
+    return `A small heads-up: it ${caution.toLowerCase()}.`;
+  }
+  return `A small heads-up: ${caution}.`;
+}
 
-  return `${productLabel} stands out because it ${reasonLine}. ${concernLine}`;
+function buildWhyForYou(product, scoreData, keywords, queryText) {
+  const concerns = scoreData.matchedConcerns.slice(0, 2);
+  const ingredients = scoreData.matchedIngredients.slice(0, 2);
+  const requestedIngredients = ingredients.filter((ingredient) => hasPhrase(queryText, ingredient));
+  const attributes = scoreData.matchedAttributes.slice(0, 2);
+  const texture = safeLower(product.specs?.texture);
+  const skinType = product.specs?.skinType || "your routine";
+
+  let opening;
+  if (requestedIngredients.length) {
+    opening = `You asked for ${joinNatural(requestedIngredients)}, and this is one of the more relevant options for that goal.`;
+  } else if (concerns.length) {
+    opening = `This makes sense for you because you mentioned ${joinNatural(concerns)}, and it is designed with those concerns in mind.`;
+  } else if (attributes.length) {
+    opening = `This is a good fit for the kind of ${joinNatural(attributes)} formula you are looking for.`;
+  } else {
+    opening = `This is a well-rounded option for what you described.`;
+  }
+
+  let detail;
+  if (ingredients.length && texture) {
+    detail = `The ${texture} gives you ${joinNatural(ingredients)} in a format that should feel easy to work into your routine.`;
+  } else if (ingredients.length) {
+    detail = `It gives you ${joinNatural(ingredients)}, which is a sensible place to start for your goals.`;
+  } else if (texture) {
+    detail = `Its ${texture} should suit ${skinType.toLowerCase()} without making the routine feel complicated.`;
+  } else {
+    detail = `Its formula is a practical match for ${skinType.toLowerCase()}.`;
+  }
+
+  const caution = buildCaution(product.cons);
+
+  return `${opening} ${detail} ${caution}`;
 }
 
 function recommendProducts(products, keywords, query, limit = 6) {
@@ -148,7 +192,7 @@ function recommendProducts(products, keywords, query, limit = 6) {
         matchScore: scoreData.score,
         rankScore: scoreData.rankScore,
         matchReason: scoreData.reasons[0] || "Good overall fit for your request",
-        whyForYou: buildWhyForYou(product, scoreData, keywords)
+        whyForYou: buildWhyForYou(product, scoreData, keywords, queryText)
       };
     })
     .sort((a, b) => b.rankScore - a.rankScore || b.rating - a.rating)
